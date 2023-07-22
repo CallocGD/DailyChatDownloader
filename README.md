@@ -14,6 +14,7 @@ Let's others know your using DailyChatDownloader through discord (discord needs 
 
 ## AFK mode
 ![alt text](https://media.discordapp.net/attachments/1126989239041675355/1128835077468606615/image.png)
+
 Allows you to do other things without having to worry about the computer shutting down during larger downloads. This is simillar to what some media-players like __VLC__ does but it uses __wakepy__ to keep systems awake.
 
 I'll add more things as time goes on and details about them - Calloc
