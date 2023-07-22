@@ -1,0 +1,69 @@
+from typing import Generator, Any , Optional
+import mmap, array 
+
+buffer = bytes | bytearray | memoryview | array.array[Any] | mmap.mmap
+
+class GDComment:
+
+    @property
+    def body(self) -> bytes:...
+
+    @property
+    def raw_comment(self) -> bytes:...
+    
+    @property
+    def authorPlayerID(self) -> bytes:...
+    
+    @property
+    def likes(self) -> int:...
+
+    @property
+    def dislikes(self) -> int:...
+    
+    @property
+    def messageID(self) -> bytes:...
+
+    @property
+    def spam(self) -> bool:...
+    
+    @property
+    def authorAccountID(self) -> bytes:...
+
+    @property
+    def age(self) -> bytes:...
+    
+    @property
+    def percent(self) -> int:...
+    
+    @property
+    def modBadge(self) -> int:...
+    
+    @property
+    def moderatorChatColor(self) -> bytes | None:...
+    
+    @property
+    def author(self)  -> bytes:...
+
+    @property
+    def icon(self) -> int:...
+
+    @property
+    def playerColor(self) -> int:...
+
+    @property
+    def playerColor2(self) -> int:...
+
+    @property
+    def icontype(self) -> int:...
+
+    @property
+    def glow(self) -> int:...
+    
+    @property
+    def as_json(self) -> bytes:...
+
+
+class GDParser:
+    def __init__(self, b: bytes | bytearray | memoryview | array.array[Any] | mmap.mmap) -> None: ...
+    def __iter__(self) -> Generator[GDComment, None, None]:...
+

@@ -1,0 +1,36 @@
+{
+    "version": "0.0.8",
+    "decoys": {
+        "gdbrowser": true,
+        "use_decoy": true,
+        "ip_decoy": ""
+    },
+    "delays": {
+        "min": 1.0,
+        "max": 3.0,
+        "cpr": 100
+    },
+    "output": {
+        "use_default_filename": true,
+        "filetype": "html"
+    },
+    "proxy": {
+        "use_proxy": false,
+        "host": "142.54.239.1",
+        "port": 4515,
+        "version": "socks4",
+        "username": "",
+        "password": ""
+    },
+    "bandwith": {
+        "bandwith": 10240,
+        "gzip": true
+    },
+    "sleep": {
+        "afk": true
+    },
+    "drp": {
+        "presense": null,
+        "on": true
+    }
+}

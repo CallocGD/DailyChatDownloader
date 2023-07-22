@@ -1,0 +1,1 @@
+from .discord_rich_presense_1 import DiscordPresense
