@@ -1,3 +1,4 @@
+![alt text](https://raw.githubusercontent.com/CallocGD/DailyChatDownloader/main/icos/DCD.ico)
 # DailyChatDownloader
 Gui Version of DCD Terminal edition Note that some code is Closed Source because it uses discord rich presense.
 This tool was made with dearpygui but I will be making a workflow to compile to linux and other systems because I've been having problems with making a build for ubuntu so it currently only works with windows. 
