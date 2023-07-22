@@ -19,3 +19,10 @@ Let's others know your using DailyChatDownloader through discord (discord needs 
 Allows you to do other things without having to worry about the computer shutting down during larger downloads. This is simillar to what some media-players like __VLC__ does but it uses __wakepy__ to keep systems awake.
 
 I'll add more things as time goes on and details about them - Calloc
+
+## TODO List
+- Move `b64.h` and make it into a cython module instead for faster performance
+- Update Spoofing/Obfuscation Techniques because I discovered that `X-Real-IP` can still get your IP address rate-limited (This is a new issue I discovered recently when running some code without a sleep delay by accident)
+- See if anyone wants to make pull-requests your are more than welcome to. 
+- Add MIT License to Repository
+
