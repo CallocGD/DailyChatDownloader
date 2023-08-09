@@ -1,0 +1,1 @@
+"env/scripts/activate" & pyinstaller DailyChatDownloader.exe.spec & "env/scripts/deactivate"

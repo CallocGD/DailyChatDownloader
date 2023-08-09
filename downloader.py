@@ -10,6 +10,7 @@ class STRFormatter:
         self.tag = tag
         self.q = Queue()
         self.thread = threading.Thread(target=self.run_thread)
+        self.thread.daemon = True
         self.not_dead = True
         self.thread.start()
 

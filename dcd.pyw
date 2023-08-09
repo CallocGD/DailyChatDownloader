@@ -11,23 +11,17 @@ from downloader import STRFormatter, ProgressFormatter
 
 from utils import coded_partial
 
+import threading
 
 from config import (
-    ProxyConfig, 
-    DecoyConfig, 
-    DelayConfig, 
-    LevelConfig, 
-    SearchConfig, 
-    OutputConfig,
-    # new in version 0.0.5
-    BandwithConfig,
-    SleepSettings,
-    load_settings,
-    dump_settings,
-    DiscordConfig,
+    AllSettings,
     # Version Moved to config so that it can be used to debug settings 
     # or whenever users need help with issue diagnosing...
-    __version__
+    __version__,
+    LevelConfig,
+    SearchConfig,
+    SleepSettings,
+    DiscordConfig
 )
 
 from external_parsing import (
@@ -153,41 +147,24 @@ class GUIContext:
 def copy_monero_wallet():
     pyperclip.copy(MONERO_WALLET)
 
-
-
+# NOTE In the Next rewrite There maybe a middle-man
+# library required for making the code here a bit smaller 
+# such as making dataclasses for the windows used...
 
 class DCDApp(GUIContext):
     def __init__(self, title: str, width: int, height: int, **kw) -> None:
         super().__init__(title, width, height, **kw)
 
-        if not Path("dcd_settings.json").exists():
-            # New user... just downloaded tools...
-            self.output = OutputConfig(True,"raw")
-            self.delays = DelayConfig(2, 5, 100)
-            self.proxy = ProxyConfig(use_proxy=False)
-            self.decoy = DecoyConfig(gdbrowser=False,use_decoy=False,ip_decoy="")
-            self.bandwith = BandwithConfig.set_defaults()
-            self.drp = DiscordConfig.set_defaults()
-
-        else:
-            self.output, self.delays, self.proxy, self.decoy , self.bandwith, self.sleep, self.drp = load_settings()
+        self.all_settings = AllSettings.load_settings()
+        self.output, self.delays, self.proxy, self.decoy , self.bandwith, self.sleep, self.drp = self.all_settings.depack()
 
         self.stop_download = False 
 
         self.search = SearchConfig()
         self.level = LevelConfig(-1)
 
-
     def save_settings(self):
-        dump_settings(
-            self.output, 
-            self.delays, 
-            self.decoy, 
-            self.proxy, 
-            self.bandwith, 
-            self.sleep,
-            self.drp
-        )
+        self.all_settings.dump_settings()
 
 
     def debug(self,sender, app_data, user_data):
@@ -198,6 +175,9 @@ class DCDApp(GUIContext):
     def bail_out(self):
         """Bails out of downloading the gd level..."""
         self.stop_download = True
+        dpg.configure_item("download_pending",show=False)
+        if self.file.exists():
+            os.remove(self.file)
 
 
     def client(self):
@@ -218,7 +198,6 @@ class DCDApp(GUIContext):
             bandwith=self.bandwith.bandwith,
             gzip=self.bandwith.gzip)
 
-
     def search_level(self, page = 0, is_next:bool = False):
         # clamp page number ourselves...
         if page < 0:
@@ -234,9 +213,6 @@ class DCDApp(GUIContext):
         with self.client() as client:
             levels = client.search_level(self.search.query, page)
         
-
-        # with dpg.window(label="Search Results",tag="level_search_results",modal=True,on_close=lambda:self.leave_search_tool()):
-            # tag = "level-id-%i"
 
         for level in levels:
             # DO NOT OVERDO THE ITEMS!!!
@@ -289,20 +265,19 @@ class DCDApp(GUIContext):
             self.ask_for_file()
         else:
             # Skip to downloading comments using default name which is the timestamp...
-            self.download_level_comments(Path(datetime.datetime.now().strftime("%Y-%m-%d-_%I-%M-%S_%p") + ".txt"))
+            self.sleep.invoke(self.download_level_comments, Path(datetime.datetime.now().strftime("%Y-%m-%d-_%I-%M-%S_%p") + ".txt"))
+
         if self.stop_download:
             self.stop_download = False
 
 
     # TODO Before 0.0.9 or something sooner allow user to download the terminal version in the options
     # Menu to give another option for downloading level comments if he or she belives downloading comments is not optimal enough... 
-    
-    # TODO Before 0.0.5 add bandwith settings which will include download speeds and a checkbox for enabling gzip settings...
-
     # TODO Drop "Evasion Settings" block and move the childern to the Settings Block to be a little faster
 
     def download_level_comments(self,file:Path):
-        
+        # TODO Add Special Logger if chosen for use. in 0.1.0
+        print("Invoking download...")
         backoff = Backoff((self.delays.min, self.delays.max))
         
         # Open Download window...
@@ -311,6 +286,7 @@ class DCDApp(GUIContext):
         level_name = STRFormatter("level_title","Level Name: %s")
         pages_left = STRFormatter("pages_left", "%.2f")
 
+        self.file = file 
         
         with self.client() as client:
             status % "Resolving Level..."
@@ -320,7 +296,6 @@ class DCDApp(GUIContext):
             status % "Getting Pagesum..."
 
             self.drp.update("Downloading Level Comments Name: %s  ID: %i" % (level.name, level.id))
-        
 
             if self.stop_download:
                 status % "Used Bailed on input Exiting..."
@@ -365,9 +340,9 @@ class DCDApp(GUIContext):
                     status % f"Getting page {p}..."
                     pages_left % ((p / pagesum) * 100)
                     progress.add()
-        
+
+        # TODO (Calloc) Add sqllite as an option in the future...
         progress.add()
-        # print("debug: " + self.output.filetype)
         if self.output.filetype and self.output.filetype != "raw":
             status % "Parsing data..."
             if self.output.filetype == "json":
@@ -376,6 +351,8 @@ class DCDApp(GUIContext):
                 robtop_string_to_text(str(file))
             elif self.output.filetype == "html":
                 robtop_string_to_html(str(file),str(file.name))
+            # Remove downloaded data after conversion although this can lead to unrecoverable data...
+            os.remove(file)
 
         status % "Done!" 
         time.sleep(2)
@@ -385,12 +362,9 @@ class DCDApp(GUIContext):
         pages_left.exit()
         # Close Download window...
         dpg.configure_item("download_pending",show=False)
+
         self.drp.update("In Menu...")
         return True
-    
-
-        
-
 
     @main_program
     def main(self):
@@ -406,39 +380,7 @@ class DCDApp(GUIContext):
         if sys.platform in ["win32","cygwin","cli"]:
             dpg.set_viewport_large_icon(image)
 
-        # TODO Move Bandwith settings to it's own custom menu...
-        # with dpg.window(label="Bandwith Settings",show=False, tag="bandwith_settings",modal=True, width=310, height=150):
-            
-        #     self.tooltip(
-        #         dpg.add_checkbox(
-        #         label="Use Gzip Protocols", 
-        #         default_value=self.bandwith.gzip, 
-        #         callback=self.bandwith.set_item_event("gzip")),
-        #         "Asks the boomlings server to use gzip.\n"\
-        #         "This can speedup request transfers immensly\n"
-        #         "however it can be costly on some lower end devices...\n\n"
-        #         "If you have an old computer that takes a long time to\n"
-        #         "open. It might be a good idea to turn this off."
-        #     )
-        #     # We do not need more than 1 MB of speed since responses do not take long to load...
-        #     self.tooltip(
-        #         dpg.add_input_int(
-        #             label="Bandwith",
-        #             min_value=1024,
-        #             min_clamped=True, 
-        #             max_value=10240,
-        #             max_clamped=True,
-        #             default_value=self.bandwith.bandwith,
-        #             callback=self.bandwith.set_item_event("bandwith")),
-        #         "Simillar to QBitTorrent, You\n"\
-        #         "can control the speeds of your\n"\
-        #         "download here minimum value is set\n"\
-        #         "to be at 1024 and the max is 10240\n"\
-        #         "robtop's data chunks are not that large\n"\
-        #         "to load at all..."
-        #     )
 
-        # For now please use noop...
         with dpg.file_dialog(directory_selector=False, show=False, tag="file_dialog", width=700 ,height=400):
             dpg.add_file_extension(".txt")
 
@@ -458,79 +400,22 @@ class DCDApp(GUIContext):
             # noop it...
             self.noop()
 
-        with dpg.window(label="Support",modal=True,show=False,tag="donations"):
-            
-            dpg.add_text(
-                        "To continue bringing great\n"\
-                        "services to people like you\n"\
-                        "as well as keeping our applications\n"\
-                        "tracker and ad-free.\n"
-                        "Please consider donating to\n"\
-                        "our Monero Wallet where your\n"\
-                        "donations won't be tracked, stolen,\n"\
-                        "viewed or modfied by any\n"\
-                        "third parties or governments"
-                    )
-        
-            dpg.add_button(label="Copy Monero Wallet", callback=lambda:copy_monero_wallet())
+        # TODO Add Easier functions all of this code can be shrunken down if done correctly
+        # In the end making a secondary library for making things with dearpygui may not be a bad idea, 
+        # such as making custom field objects for those modules...
 
-        with dpg.window(label="Credits",modal=True,tag="credits_display",show=False):
-            dpg.add_text("Calloc - Developer of the Daily Chat Downloader")
-            dpg.add_text("Inspired by the original DCD Commandline module")
-            dpg.add_text("Note - The Developer or anyone who\n"\
-                        "contributes to the software is not\n"\
-                        "responsible for what you download\n"\
-                        "Download Level Comments at your own risk,\n"\
-                        "This is not legal advice...")
-            dpg.add_text(f"Version - {__version__}")
-            dpg.add_text("Licsense - MIT")
-            dpg.add_button(label="Exit",callback=lambda:dpg.configure_item("credits_display", show=False))
-
-        # with dpg.window(label="Delay Settings",modal=True,tag="delay_settings",show=False):
-           
-
-            
-
-            # with dpg.group(horizontal=True):
-            #     dpg.add_button(label="Save", callback=lambda: dpg.configure_item("delay_settings", show=False))
-                # dpg.add_button(label="Preview",callback=lambda: print(self.delays))
-
-        # TODO Move to Menu instead of here...
-        # with dpg.window(label="Decoy Settings",modal=True,tag="decoy_settings",show=False):
-        #     self.tooltip(dpg.add_checkbox(label="Mimic Gdbrowser Instance",default_value=self.decoy.gdbrowser,callback=self.decoy.set_item_event("gdbrowser")), 
-        #                  "tricks the boomlings server\ninto thinking were hosting gdbrowser")
-        #     self.tooltip(dpg.add_checkbox(label="Spoof Client IP Address",default_value=self.decoy.use_decoy,callback=self.decoy.set_item_event("use_decoy")),
-        #     "Makes boomlings servers think\n"\
-        #     "that were a server that is\n"\
-        #     "trying to forward someone\n"\
-        #     "else to their end..."
-        #     )
-        #     self.tooltip(dpg.add_input_text(label="fake-ip",default_value=self.decoy.ip_decoy,callback=self.decoy.set_item_event("ip_decoy")),
-        #                 "this will use the fake ip you give\n"\
-        #                 "however it is better to ignore this\n"\
-        #                 "and use a random ip that dcd will\n"\
-        #                 "generate for you if you have\n"\
-        #                 "Spoof Client IP Address Enabled")
-            
-            # with dpg.group(horizontal=True):
-            #     dpg.add_button(label="Save", callback=lambda: dpg.configure_item("decoy_settings", show=False))
-            #     dpg.add_button(label="Preview",callback=lambda:print(self.decoy))
-
-
-        # Proxy Settings Child window...
-        with dpg.window(label="Proxy Settings",modal=True,tag="proxy_settings",show=False):
+        # TODO Make LevelID Input use 128 bit - numbers  
+        with dpg.window(label="Proxy Settings",modal=True,tag="proxy_settings",show=False,on_close=lambda: dpg.configure_item("proxy_settings", show=False)):
             dpg.add_checkbox(label="Enable Proxy Connections",tag="use_proxy", default_value=self.proxy.use_proxy ,callback=self.proxy.set_item_event("use_proxy"))
-
             dpg.add_input_text(label="host",default_value=self.proxy.host,callback=self.proxy.set_item_event("host"))
             dpg.add_input_int(label="port",min_value=0,default_value=self.proxy.port,min_clamped=True,max_value=65536,max_clamped=True,callback=self.proxy.set_item_event("port"))
             dpg.add_combo(["http","socks5","socks4"],default_value=self.proxy.version,label="Version",callback=self.proxy.set_item_event("version"))
-            
             self.tooltip(dpg.add_input_text(label="user",default_value=self.proxy.username,callback=self.proxy.set_item_event("username")), SOCKS5TOOLTIP)
             self.tooltip(dpg.add_input_text(label="pass",default_value=self.proxy.password,password=True,callback=self.proxy.set_item_event("password")),SOCKS5TOOLTIP)
 
             with dpg.group(horizontal=True):
                 dpg.add_button(label="Save", callback=lambda: dpg.configure_item("proxy_settings", show=False))
-                dpg.add_button(label="Preview",callback=lambda:print(self.proxy.url))
+         
 
         with self.main_window("MAIN WINDOW"):
             
@@ -634,11 +519,35 @@ class DCDApp(GUIContext):
                     with dpg.menu(label="Discord Settings"):
                         self.tooltip(dpg.add_checkbox(label="Enable Discord Rich Presense", default_value=self.drp.on, callback=self.drp.update_config), DiscordConfig.__doc__)
                     # self.tooltip(ev,"These settings help with\nevading ip bans\nand rate limiting\nWarning Evasion Block will be removed in 0.0.3....\nall blocks will be moved over here instead...")
-                # TODO Add bandwith and Gzip settings to 0.0.4
 
                 with dpg.menu(label="Other"):
-                    dpg.add_menu_item(label="Credits",callback=lambda:dpg.configure_item("credits_display", show=True))
-                    dpg.add_menu_item(label="Support",callback=lambda:dpg.configure_item("donations",show=True))
+                    with dpg.menu(label="Credits"):
+                        dpg.add_text("Calloc - Developer of the Daily Chat Downloader")
+                        dpg.add_text("Inspired by the original DCD Commandline module")
+                        dpg.add_text("Note - The Developer or anyone who\n"\
+                                    "contributes to the software is not\n"\
+                                    "responsible for what you download\n"\
+                                    "Download Level Comments at your own risk,\n"\
+                                    "This is not legal advice...")
+                        dpg.add_text(f"Version - {__version__}")
+                        dpg.add_text("Licsense - MIT")
+                    
+                    with dpg.menu(label="Support"):
+                        dpg.add_text("To continue bringing great\n"\
+                        "services to people like you\n"\
+                        "as well as keeping our applications\n"\
+                        "tracker and ad-free.\n"
+                        "Please consider donating to\n"\
+                        "our Monero Wallet where your\n"\
+                        "donations won't be tracked, stolen,\n"\
+                        "viewed or modfied by any\n"\
+                        "third parties or governments")
+        
+                        dpg.add_button(label="Copy Monero Wallet", callback=copy_monero_wallet)
+
+
+                    
+
 
             dpg.add_text("The Geometry Dash Level Comment Downloader Tool - By Calloc")
         # Now work on the tabs...
